@@ -1,11 +1,27 @@
-/* $Id$ */
+/*
+ * Copyright 2008 Ryan Berdeen.
+ *
+ * This file is part of dJava.
+ *
+ * dJava is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as published
+ * by the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * dJava is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with dJava.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-package org.p2presenter.remoting;
+package com.ryanberdeen.djava;
 
 import java.lang.reflect.Proxy;
 
 import org.p2presenter.messaging.LocalConnection;
-
 
 public class RemoteInvocationConnection {
 	private LocalConnection connection;
@@ -25,11 +41,6 @@ public class RemoteInvocationConnection {
 	@SuppressWarnings("unchecked")
 	public <T> T proxy(Class<T> interfaceClass, RemoteObjectReference remoteProxyReference) {
 		return (T) Proxy.newProxyInstance(interfaceClass.getClassLoader(), new Class[] {interfaceClass, RemoteInvocationProxy.class}, new RemoteObjectInvocationHandler(connection, uri, bidirectional, remoteProxyReference));
-	}
-	
-	@SuppressWarnings("unchecked")
-	public <T> T proxy(Class<T> interfaceClass, String variableName) {
-		return (T) Proxy.newProxyInstance(interfaceClass.getClassLoader(), new Class[] {interfaceClass, RemoteInvocationProxy.class}, new RemoteObjectInvocationHandler(connection, uri, bidirectional, variableName));
 	}
 	
 	public LocalConnection getConnection() {
