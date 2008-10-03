@@ -36,7 +36,6 @@ import org.p2presenter.messaging.message.ResponseMessage;
 import org.p2presenter.messaging.message.RequestHeaders.RequestType;
 
 class RemoteObjectInvocationHandler implements InvocationHandler {
-	private String remoteVariableName;
 	private RemoteObjectReference remoteObjectReference;
 	private Connection connection;
 	private String uri;
@@ -55,22 +54,12 @@ class RemoteObjectInvocationHandler implements InvocationHandler {
 		this.remoteObjectReference = remoteObjectReference;
 	}
 	
-	public RemoteObjectInvocationHandler(Connection connection, String uri, boolean bidirectional, String remoteVariableName) {
-		this(connection, uri, bidirectional);
-		this.remoteVariableName = remoteVariableName;
-	}
-	
 	public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
 		if (proxyCache == null) {
 			proxyCache = ProxyCache.getProxyCache(connection, uri);
 		}
 		if (method.getName().equals("getRemoteObjectReference") && method.getParameterTypes().length == 0) {
 			return remoteObjectReference;
-		}
-		else if (remoteVariableName != null) {
-			OutgoingRequestMessage request = new OutgoingRequestMessage(connection, RequestType.EVALUATE, uri);
-			request.setHeader(InvocationRequestHandler.TARGET_NAME_HEADER_NAME, remoteVariableName);
-			return invoke(request, method, args);
 		}
 		else {
 			OutgoingRequestMessage request = new OutgoingRequestMessage(connection, RequestType.EVALUATE, uri);

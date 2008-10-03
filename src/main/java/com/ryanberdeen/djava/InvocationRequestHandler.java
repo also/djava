@@ -108,15 +108,7 @@ public class InvocationRequestHandler implements RequestHandler {
 					parameterTypes = new Class[0];
 				}
 				
-				Object target;
-				String targetName = request.getHeader(TARGET_NAME_HEADER_NAME);
-				if (targetName != null) {
-					// TODO the target should come from somewhere else
-					target = request.getConnection().getAttribute(targetName);
-				}
-				else {
-					target = proxyCache.getTarget(new Integer(request.getHeader(TARGET_PROXY_ID_HEADER_NAME)));
-				}
+				Object target = proxyCache.getTarget(new Integer(request.getHeader(TARGET_PROXY_ID_HEADER_NAME)));
 				
 				Class<?> targetClass = target.getClass();
 				Method method = targetClass.getMethod(request.getHeader(METHOD_NAME_HEADER_NAME), parameterTypes);
