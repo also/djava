@@ -17,7 +17,7 @@
  * License along with dJava.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.ryanberdeen.djava;
+package com.ryanberdeen.djava.connection.postal;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -26,21 +26,21 @@ import java.io.NotSerializableException;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
-import org.p2presenter.messaging.message.OutgoingResponseMessage;
-import org.p2presenter.messaging.message.RequestMessage;
+import com.ryanberdeen.postal.message.OutgoingResponseMessage;
+import com.ryanberdeen.postal.message.RequestMessage;
 
 public class OutgoingSerializedObjectResponseMessage extends OutgoingResponseMessage {
 	public OutgoingSerializedObjectResponseMessage(RequestMessage inResponseToMessage) {
 		super(inResponseToMessage);
 	}
-	
+
 	public void setContentObject(Serializable content) throws InvalidClassException, NotSerializableException {
 		ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 		try {
 			ObjectOutputStream out = new ObjectOutputStream(bytes);
 			out.writeObject(content);
 			out.close();
-			
+
 			setContent(bytes.toByteArray(), InvocationRequestHandler.CONTENT_TYPE);
 		}
 		catch (InvalidClassException ex) {

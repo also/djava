@@ -17,20 +17,22 @@
  * License along with dJava.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.ryanberdeen.djava;
+package com.ryanberdeen.djava.connection.postal;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectStreamException;
-import java.io.Serializable;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 
-import org.p2presenter.messaging.Connection;
-import org.p2presenter.messaging.handler.RequestHandler;
-import org.p2presenter.messaging.message.IncomingRequestMessage;
-import org.p2presenter.messaging.message.OutgoingResponseMessage;
+import com.ryanberdeen.djava.InvocationListener;
+import com.ryanberdeen.djava.LocalInvocation;
+import com.ryanberdeen.djava.ObjectDescriptor;
+import com.ryanberdeen.djava.RemoteObjectReference;
+import com.ryanberdeen.djava.TargetNotFoundException;
+import com.ryanberdeen.postal.handler.RequestHandler;
+import com.ryanberdeen.postal.message.IncomingRequestMessage;
+import com.ryanberdeen.postal.message.OutgoingResponseMessage;
 
 /** Handles invocation request messages.
  * @author rmberdeen
@@ -55,50 +57,21 @@ public class InvocationRequestHandler implements RequestHandler {
 	public OutgoingResponseMessage handleRequest(IncomingRequestMessage request) {
 		OutgoingSerializedObjectResponseMessage response = new OutgoingSerializedObjectResponseMessage(request);
 
-
 		try {
 			try {
-				ProxyCache proxyCache = ProxyCache.getProxyCache(request.getConnection(), request.getUri());
-				Invocation invocation = parseMessage(request, proxyCache);
+				PostalDJavaConnection dJavaConnection = PostalDJavaConnection.getPostalDJavaConnection(request.getConnection(), request.getUri(), true);
+				LocalInvocation localInvocation = parseMessage(request, dJavaConnection);
 
-				Object result;
-
-				// TODO unwrap invocation target exception
-
-				if (invocationListener != null) {
-					/* if the method is synchronized, the order in which it is entered is significant */
-					if (Modifier.isSynchronized(invocation.getMethod().getModifiers())) {
-						/* make sure that events for target are logged in the order they actually happen */
-						synchronized (invocation.getTarget()) {
-							result = invokeAndNotify(invocation);
-						}
-					}
-					else {
-						/* if the method isn't synchronized, order doesn't matter */
-						result = invokeAndNotify(invocation);
-					}
-				}
-				else {
-					result = invocation.invoke();
-				}
-
-				if (result != null) {
-					Class<?> returnType = invocation.getMethod().getReturnType();
-					// TODO probably shouldn't serialize enums
-					// TODO serialize wrapper types when method doesn't return primitive
-					if (returnType == String.class || returnType.isPrimitive() || Enum.class.isAssignableFrom(returnType)) {
-						response.setContentObject((Serializable) result);
-					}
-					else {
-						response.setContentObject(proxyCache.getObjectDescriptor(result));
-					}
-				}
+				response.setContentObject(dJavaConnection.invoke(localInvocation));
 			}
 			catch (Exception ex) {
 				ex.printStackTrace();
 				response.setStatus(500);
 				response.setContentObject(ex);
 				// TODO send the exception message if it can't be serialized
+			}
+			catch (Throwable t) {
+				throw (Error) t;
 			}
 		}
 		catch (ObjectStreamException ex) {
@@ -113,7 +86,7 @@ public class InvocationRequestHandler implements RequestHandler {
 		return response;
 	}
 
-	private Invocation parseMessage(IncomingRequestMessage request, ProxyCache proxyCache) throws ClassNotFoundException, NoSuchMethodException {
+	private LocalInvocation parseMessage(IncomingRequestMessage request, PostalDJavaConnection dJavaConnection) throws ClassNotFoundException, NoSuchMethodException {
 		String argumentCountHeader = request.getHeader(ARGUMENT_COUNT_HEADER_NAME);
 		int argumentCount = Integer.parseInt(argumentCountHeader);
 
@@ -131,10 +104,10 @@ public class InvocationRequestHandler implements RequestHandler {
 					if (args[i] instanceof RemoteObjectReference) {
 						if (args[i] instanceof ObjectDescriptor) {
 							// TODO
-							args[i] = proxyCache.getProxy(request.getConnection(), true, (ObjectDescriptor) args[i]);
+							args[i] = dJavaConnection.getProxy((ObjectDescriptor) args[i]);
 						}
 						else {
-							args[i] = proxyCache.getTarget(((RemoteObjectReference) args[i]).getId());
+							args[i] = dJavaConnection.getTarget(((RemoteObjectReference) args[i]).getId());
 						}
 					}
 				}
@@ -161,21 +134,17 @@ public class InvocationRequestHandler implements RequestHandler {
 			parameterTypes = new Class[0];
 		}
 
-		Object target = proxyCache.getTarget(new Integer(request.getHeader(TARGET_PROXY_ID_HEADER_NAME)));
+		Integer targetId = new Integer(request.getHeader(TARGET_PROXY_ID_HEADER_NAME));
+		String methodName = request.getHeader(METHOD_NAME_HEADER_NAME);
+
+		Object target = dJavaConnection.getTarget(targetId);
+		if (target == null) {
+			throw new TargetNotFoundException(targetId, methodName);
+		}
 
 		Class<?> targetClass = target.getClass();
-		Method method = targetClass.getMethod(request.getHeader(METHOD_NAME_HEADER_NAME), parameterTypes);
+		Method method = targetClass.getMethod(methodName, parameterTypes);
 
-		return new Invocation(target, method, args);
-	}
-
-	/** Invokes the method on the target, notifying the listener before and after.
-	 */
-	private Object invokeAndNotify(Invocation invocation) throws Exception {
-		Object before = invocationListener.beforeMethodInvocation(invocation.getTarget(), invocation.getMethod(), invocation.getArguments());
-		Object result = invocation.invoke();
-		invocationListener.afterMethodInvocation(before, result);
-
-		return result;
+		return new LocalInvocation(target, method, args, invocationListener);
 	}
 }

@@ -19,49 +19,50 @@
 
 package com.ryanberdeen.djava;
 
+import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
-import java.util.concurrent.Callable;
 
-import org.p2presenter.messaging.Connection;
+import com.ryanberdeen.djava.connection.DJavaConnection;
 
 public class ProxyCache {
-	private static final String PROXY_CACHE_ATTRIBUTE_PREFIX = ProxyCache.class.getName() + "proxyCache.";
-	private String uri;
+	private boolean bidirectional;
 	private Integer proxyNumber = 1;
 	private HashMap<Object, ObjectDescriptor> objectDescriptors = new HashMap<Object, ObjectDescriptor>();
-	
-	private ProxyCache(String uri) {
-		this.uri = uri;
-	}
-	
+
 	/** Maps from id to target*/
 	private HashMap<Integer, Object> localObjects = new HashMap<Integer, Object>();
-	
+
 	private HashMap<RemoteObjectReference, WeakReference<RemoteInvocationProxy>> proxyReferences = new HashMap<RemoteObjectReference, WeakReference<RemoteInvocationProxy>>();
-	
-	
+
+	private HashMap<Long, Thread> waitingThreads;
+	private HashMap<Long, LocalInvocation> pendingInvocations;
+
+	public ProxyCache(boolean bidirectional) {
+		this.bidirectional = bidirectional;
+	}
+
 	public Object getTarget(Integer id) {
 		return localObjects.get(id);
 	}
-	
+
 	public ObjectDescriptor getObjectDescriptor(Object toProxy) throws Exception {
 		synchronized (objectDescriptors) {
 			ObjectDescriptor objectDescriptor = objectDescriptors.get(toProxy);
-		
+
 			if (objectDescriptor == null) {
 				Class<?>[] interfaces = toProxy.getClass().getInterfaces();
 				objectDescriptor = new ObjectDescriptor(interfaces, proxyNumber++);
 				objectDescriptors.put(toProxy, objectDescriptor);
 				localObjects.put(objectDescriptor.getId(), toProxy);
 			}
-		
+
 			return objectDescriptor;
 		}
 	}
-	
-	public RemoteInvocationProxy getProxy(Connection connection, boolean bidirectional, ObjectDescriptor objectDescriptor) {
+
+	public RemoteInvocationProxy getProxy(DJavaConnection connection, ObjectDescriptor objectDescriptor) {
 		synchronized (proxyReferences) {
 			RemoteInvocationProxy proxy = null;
 			WeakReference<RemoteInvocationProxy> remoteProxyReference = proxyReferences.get(objectDescriptor);
@@ -72,27 +73,65 @@ public class ProxyCache {
 				Class<?>[] interfaceClasses = new Class[objectDescriptor.getProxiedClasses().length + 1];
 				System.arraycopy(objectDescriptor.getProxiedClasses(), 0, interfaceClasses, 1, objectDescriptor.getProxiedClasses().length);
 				interfaceClasses[0] = RemoteInvocationProxy.class;
-				proxy = (RemoteInvocationProxy) Proxy.newProxyInstance(interfaceClasses[0].getClassLoader(), interfaceClasses, new RemoteObjectInvocationHandler(connection, uri, bidirectional, new RemoteObjectReference(objectDescriptor)));
+				RemoteObjectInvocationHandler handler = new RemoteObjectInvocationHandler(connection, new RemoteObjectReference(objectDescriptor));
+				proxy = (RemoteInvocationProxy) Proxy.newProxyInstance(interfaceClasses[0].getClassLoader(), interfaceClasses, handler);
 				proxyReferences.put(objectDescriptor.getRemoteObjectReference(), new WeakReference<RemoteInvocationProxy>(proxy));
 			}
-			
+
 			return proxy;
 		}
 	}
-	
-	public static ProxyCache getProxyCache(Connection connection, String uri) {
-		return (ProxyCache) connection.getAttribute(PROXY_CACHE_ATTRIBUTE_PREFIX  + uri, new CreateProxyCacheCallable(uri));
-	}
-	
-	public static class CreateProxyCacheCallable implements Callable<Object> {
-		private String uri;
-		
-		public CreateProxyCacheCallable(String uri) {
-			this.uri = uri;
-		}
 
-		public Object call() {
-			return new ProxyCache(uri);
+	public void registerWaitingThread() {
+		Thread thread = Thread.currentThread();
+		waitingThreads.put(thread.getId(), thread);
+	}
+
+	/** Performs the method invocations requested of the current thread. */
+	public void performInvocations() {
+
+	}
+
+	public Serializable invoke(LocalInvocation localInvocation) throws Throwable {
+		Object result = localInvocation.invoke();
+
+		if (result != null) {
+			Class<?> returnType = localInvocation.getReturnType();
+			// TODO probably shouldn't serialize enums
+			// TODO serialize wrapper types when method doesn't return primitive
+			if (returnType == String.class || returnType.isPrimitive() || Enum.class.isAssignableFrom(returnType)) {
+				return (Serializable) result;
+			}
+			else {
+				return getObjectDescriptor(result);
+			}
+		}
+		else {
+			return null;
+		}
+	}
+
+	public Object toOutgoing(Object object, Class<?> parameterType) throws Exception {
+		if (object instanceof RemoteInvocationProxy) {
+			// send a reference to the remote object
+			return ((RemoteInvocationProxy) object).getRemoteObjectReference();
+		}
+		else if (bidirectional && parameterType.isInterface()) {
+			// send a reference to the local object
+			return getObjectDescriptor(object);
+		}
+		else {
+			return object;
+		}
+	}
+
+	/** Converts an incoming object to one that can be used for a return value. */
+	public Object fromResponse(DJavaConnection connection, Object result) {
+		if (result instanceof ObjectDescriptor) {
+			return getProxy(connection, (ObjectDescriptor) result);
+		}
+		else {
+			return result;
 		}
 	}
 }
