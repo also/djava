@@ -31,7 +31,7 @@ import java.util.concurrent.Future;
 
 import com.ryanberdeen.djava.LocalInvocation;
 import com.ryanberdeen.djava.ObjectDescriptor;
-import com.ryanberdeen.djava.ProxyCache;
+import com.ryanberdeen.djava.DJavaContext;
 import com.ryanberdeen.djava.RemoteInvocation;
 import com.ryanberdeen.djava.RemoteInvocationProxy;
 import com.ryanberdeen.djava.connection.DJavaConnection;
@@ -42,32 +42,32 @@ import com.ryanberdeen.postal.message.ResponseMessage;
 import com.ryanberdeen.postal.message.RequestHeaders.RequestType;
 
 public class PostalDJavaConnection implements DJavaConnection {
-	private static final String CONNECTION_ATTRIBUTE_PREFIX = ProxyCache.class.getName() + "proxyCache.";
+	private static final String CONNECTION_ATTRIBUTE_PREFIX = DJavaContext.class.getName() + "dJavaContext.";
 
 	private Connection connection;
 	private String uri;
-	private ProxyCache proxyCache;
+	private DJavaContext dJavaContext;
 
 	public PostalDJavaConnection(Connection connection, String uri, boolean bidirectional) {
 		this.connection = connection;
 		this.uri = uri;
-		proxyCache = new ProxyCache(bidirectional);
+		dJavaContext = new DJavaContext(bidirectional);
 	}
 
 	public RemoteInvocationProxy getProxy(ObjectDescriptor objectDescriptor) {
-		return proxyCache.getProxy(this, objectDescriptor);
+		return dJavaContext.getProxy(this, objectDescriptor);
 	}
 
 	public Object getTarget(Integer id) {
-		return proxyCache.getTarget(id);
+		return dJavaContext.getTarget(id);
 	}
 
 	public Serializable invoke(LocalInvocation localInvocation) throws Throwable {
-		return proxyCache.invoke(localInvocation);
+		return dJavaContext.invoke(localInvocation);
 	}
 
 	public ObjectDescriptor getObjectDescriptor(Object toProxy) throws Exception {
-		return proxyCache.getObjectDescriptor(toProxy);
+		return dJavaContext.getObjectDescriptor(toProxy);
 	}
 
 	// TODO should use proxy cache
@@ -76,7 +76,7 @@ public class PostalDJavaConnection implements DJavaConnection {
 		Class[] classes = new Class[] {interfaceClass};
 
 		ObjectDescriptor objectDescriptor = new ObjectDescriptor(classes, id);
-		return (T) proxyCache.getProxy(this, objectDescriptor);
+		return (T) dJavaContext.getProxy(this, objectDescriptor);
 	}
 
 	public Object invokeRemotely(RemoteInvocation invocation) throws Throwable {
@@ -104,7 +104,7 @@ public class PostalDJavaConnection implements DJavaConnection {
 
 				for (int i = 0; i < args.length; i++) {
 					Object argument = args[i];
-					argument = proxyCache.toOutgoing(argument, parameterTypes[i]);
+					argument = dJavaContext.toOutgoing(argument, parameterTypes[i]);
 					out.writeObject(argument);
 				}
 
@@ -153,7 +153,7 @@ public class PostalDJavaConnection implements DJavaConnection {
 		if (InvocationRequestHandler.CONTENT_TYPE.equals(response.getContentType())) {
 			ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(response.getContent()));
 
-			return proxyCache.fromResponse(this, in.readObject());
+			return dJavaContext.fromResponse(this, in.readObject());
 		}
 		else {
 			return null;

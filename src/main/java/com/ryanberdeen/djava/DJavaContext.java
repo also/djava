@@ -26,7 +26,7 @@ import java.util.HashMap;
 
 import com.ryanberdeen.djava.connection.DJavaConnection;
 
-public class ProxyCache {
+public class DJavaContext {
 	private boolean bidirectional;
 	private Integer proxyNumber = 1;
 	private HashMap<Object, ObjectDescriptor> objectDescriptors = new HashMap<Object, ObjectDescriptor>();
@@ -39,7 +39,7 @@ public class ProxyCache {
 	private HashMap<Long, Thread> waitingThreads;
 	private HashMap<Long, LocalInvocation> pendingInvocations;
 
-	public ProxyCache(boolean bidirectional) {
+	public DJavaContext(boolean bidirectional) {
 		this.bidirectional = bidirectional;
 	}
 
