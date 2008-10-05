@@ -32,7 +32,7 @@ import com.ryanberdeen.postal.message.IncomingRequestMessage;
 public class PostalLocalInvocation extends LocalInvocation {
 	private IncomingRequestMessage request;
 
-	public PostalLocalInvocation(IncomingRequestMessage request, DJavaConnection connection, long requestingThreadId, Long targetThreadId, Object target, Method method, Object[] arguments, InvocationListener invocationListener) {
+	public PostalLocalInvocation(IncomingRequestMessage request, DJavaConnection connection, long requestingThreadId, Long targetThreadId, Object target, Method method, Object[] arguments, InvocationListener<?> invocationListener) {
 		super(connection, requestingThreadId, targetThreadId, target, method, arguments, invocationListener);
 		this.request = request;
 	}

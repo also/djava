@@ -33,9 +33,10 @@ public abstract class LocalInvocation extends Invocation<Object> {
 	private long requestingThreadId;
 	private Long targetThreadId;
 	protected DJavaConnection dJavaConnection;
+	@SuppressWarnings("unchecked")
 	private InvocationListener invocationListener;
 
-	public LocalInvocation(DJavaConnection dJavaConnection, long requestingThreadId, Long targetThreadId, Object target, Method method, Object[] arguments, InvocationListener invocationListener) {
+	public LocalInvocation(DJavaConnection dJavaConnection, long requestingThreadId, Long targetThreadId, Object target, Method method, Object[] arguments, InvocationListener<?> invocationListener) {
 		super(target, method, arguments);
 		this.dJavaConnection = dJavaConnection;
 		this.requestingThreadId = requestingThreadId;
@@ -104,6 +105,7 @@ public abstract class LocalInvocation extends Invocation<Object> {
 
 	/** Invokes the method on the target, notifying the listener before and after.
 	 */
+	@SuppressWarnings("unchecked")
 	private Object invokeAndNotify() throws InvocationTargetException, IllegalAccessException {
 		Object before = invocationListener.beforeMethodInvocation(target, method, arguments);
 		Object result = method.invoke(target, arguments);
