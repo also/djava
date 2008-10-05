@@ -19,51 +19,88 @@
 
 package com.ryanberdeen.djava;
 
+import java.io.Serializable;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
+import com.ryanberdeen.djava.connection.DJavaConnection;
+
 /** Stores values necessary to invoke a method on a target.
  *
  */
-public class LocalInvocation extends Invocation<Object> {
+public abstract class LocalInvocation extends Invocation<Object> {
+	private long requestingThreadId;
+	private Long targetThreadId;
+	protected DJavaConnection dJavaConnection;
 	private InvocationListener invocationListener;
 
-	public LocalInvocation(Object target, Method method, Object[] arguments, InvocationListener invocationListener) {
+	public LocalInvocation(DJavaConnection dJavaConnection, long requestingThreadId, Long targetThreadId, Object target, Method method, Object[] arguments, InvocationListener invocationListener) {
 		super(target, method, arguments);
+		this.dJavaConnection = dJavaConnection;
+		this.requestingThreadId = requestingThreadId;
+		this.targetThreadId = targetThreadId;
 		this.invocationListener = invocationListener;
 	}
 
-	public Object invoke() throws Throwable {
-		Object result;
-		// TODO why is this necessary
-		method.setAccessible(true);
+	public Long getTargetThreadId() {
+		return targetThreadId;
+	}
 
-		// TODO unwrap invocation target exception
+	public void invoke() throws Throwable {
+		Long outerRequestingThreadId = dJavaConnection.getRequestingThreadId();
+		dJavaConnection.setRequestingThreadId(requestingThreadId);
+
 		try {
-			if (invocationListener != null) {
-				/* if the method is synchronized, the order in which it is entered is significant */
-				if (Modifier.isSynchronized(method.getModifiers())) {
-					/* make sure that events for target are logged in the order they actually happen */
-					synchronized (target) {
+			Object result;
+			// TODO why is this necessary
+			method.setAccessible(true);
+
+			try {
+				if (invocationListener != null) {
+					/* if the method is synchronized, the order in which it is entered is significant */
+					if (Modifier.isSynchronized(method.getModifiers())) {
+						/* make sure that events for target are logged in the order they actually happen */
+						synchronized (target) {
+							result = invokeAndNotify();
+						}
+					}
+					else {
+						/* if the method isn't synchronized, order doesn't matter */
 						result = invokeAndNotify();
 					}
 				}
 				else {
-					/* if the method isn't synchronized, order doesn't matter */
-					result = invokeAndNotify();
+					result = method.invoke(target, arguments);
 				}
 			}
-			else {
-				result = method.invoke(target, arguments);
+			catch (InvocationTargetException e) {
+				Throwable cause = e.getCause();
+				if (cause instanceof Exception) {
+					handleThrowable(cause);
+					return;
+				}
+				else {
+					throw cause;
+				}
 			}
-		}
-		catch (InvocationTargetException e) {
-			throw e.getCause();
-		}
 
-		return result;
+			handleResult(toResponse(result));
+		}
+		catch (Exception ex) {
+			handleInternalThrowable(ex);
+		}
+		catch (Throwable ex) {
+			throw ex;
+		}
+		finally {
+			dJavaConnection.setRequestingThreadId(outerRequestingThreadId);
+		}
 	}
+
+	protected abstract void handleResult(Serializable result) throws Exception;
+	protected abstract void handleThrowable(Throwable t) throws Exception;
+	protected abstract void handleInternalThrowable(Throwable t);
 
 	/** Invokes the method on the target, notifying the listener before and after.
 	 */
@@ -75,7 +112,20 @@ public class LocalInvocation extends Invocation<Object> {
 		return result;
 	}
 
-	public Class<?> getReturnType() {
-		return method.getReturnType();
+	private Serializable toResponse(Object result) throws Exception {
+		if (result != null) {
+			Class<?> returnType = method.getReturnType();
+			// TODO probably shouldn't serialize enums
+			// TODO serialize wrapper types when method doesn't return primitive
+			if (returnType == String.class || returnType.isPrimitive() || Enum.class.isAssignableFrom(returnType)) {
+				return (Serializable) result;
+			}
+			else {
+				return dJavaConnection.getObjectDescriptor(result);
+			}
+		}
+		else {
+			return null;
+		}
 	}
 }

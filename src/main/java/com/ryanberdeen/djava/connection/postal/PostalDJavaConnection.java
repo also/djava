@@ -24,16 +24,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.Serializable;
 import java.rmi.RemoteException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
-import com.ryanberdeen.djava.LocalInvocation;
-import com.ryanberdeen.djava.ObjectDescriptor;
 import com.ryanberdeen.djava.DJavaContext;
 import com.ryanberdeen.djava.RemoteInvocation;
-import com.ryanberdeen.djava.RemoteInvocationProxy;
 import com.ryanberdeen.djava.connection.DJavaConnection;
 import com.ryanberdeen.postal.Connection;
 import com.ryanberdeen.postal.message.IncomingResponseMessage;
@@ -41,47 +37,26 @@ import com.ryanberdeen.postal.message.OutgoingRequestMessage;
 import com.ryanberdeen.postal.message.ResponseMessage;
 import com.ryanberdeen.postal.message.RequestHeaders.RequestType;
 
-public class PostalDJavaConnection implements DJavaConnection {
+public class PostalDJavaConnection extends DJavaConnection {
 	private static final String CONNECTION_ATTRIBUTE_PREFIX = DJavaContext.class.getName() + "dJavaContext.";
 
 	private Connection connection;
 	private String uri;
-	private DJavaContext dJavaContext;
 
 	public PostalDJavaConnection(Connection connection, String uri, boolean bidirectional) {
+		super(bidirectional);
 		this.connection = connection;
 		this.uri = uri;
-		dJavaContext = new DJavaContext(bidirectional);
-	}
-
-	public RemoteInvocationProxy getProxy(ObjectDescriptor objectDescriptor) {
-		return dJavaContext.getProxy(this, objectDescriptor);
-	}
-
-	public Object getTarget(Integer id) {
-		return dJavaContext.getTarget(id);
-	}
-
-	public Serializable invoke(LocalInvocation localInvocation) throws Throwable {
-		return dJavaContext.invoke(localInvocation);
-	}
-
-	public ObjectDescriptor getObjectDescriptor(Object toProxy) throws Exception {
-		return dJavaContext.getObjectDescriptor(toProxy);
-	}
-
-	// TODO should use proxy cache
-	@SuppressWarnings("unchecked")
-	public <T> T proxy(Class<T> interfaceClass, Integer id) {
-		Class[] classes = new Class[] {interfaceClass};
-
-		ObjectDescriptor objectDescriptor = new ObjectDescriptor(classes, id);
-		return (T) dJavaContext.getProxy(this, objectDescriptor);
 	}
 
 	public Object invokeRemotely(RemoteInvocation invocation) throws Throwable {
 		OutgoingRequestMessage request = new OutgoingRequestMessage(connection, RequestType.EVALUATE, uri);
+		request.setHeader(InvocationRequestHandler.REQUESTING_THREAD_ID_HEADER_NAME, String.valueOf(Thread.currentThread().getId()));
 		request.setHeader(InvocationRequestHandler.TARGET_PROXY_ID_HEADER_NAME, String.valueOf(invocation.getTargetId()));
+		Long targetThreadId = getRequestingThreadId();
+		if (targetThreadId != null) {
+			request.setHeader(InvocationRequestHandler.TARGET_THREAD_ID_HEADER_NAME, String.valueOf(targetThreadId));
+		}
 
 		request.setHeader(InvocationRequestHandler.METHOD_NAME_HEADER_NAME, invocation.getMethodName());
 		Class<?>[] parameterTypes = invocation.getParameterTypes();
@@ -129,7 +104,7 @@ public class PostalDJavaConnection implements DJavaConnection {
 			return null;
 		}
 		else {
-			response = futureResponse.get();
+			response = dJavaContext.awaitResponse(futureResponse);
 
 			// TODO check for null response (connection closed)
 
@@ -146,6 +121,15 @@ public class PostalDJavaConnection implements DJavaConnection {
 					throw new RemoteException("Remote error " + response.getStatus() + ": " + response.getContentAsString());
 				}
 			}
+		}
+	}
+
+	public void sendResponse(OutgoingSerializedObjectResponseMessage response) {
+		try {
+			connection.sendResponse(response);
+		}
+		catch (IOException ex) {
+			// TODO what do we do if sending the return value fails
 		}
 	}
 

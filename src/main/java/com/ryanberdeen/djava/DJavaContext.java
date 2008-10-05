@@ -19,10 +19,12 @@
 
 package com.ryanberdeen.djava;
 
-import java.io.Serializable;
 import java.lang.ref.WeakReference;
 import java.lang.reflect.Proxy;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
 import com.ryanberdeen.djava.connection.DJavaConnection;
 
@@ -36,8 +38,7 @@ public class DJavaContext {
 
 	private HashMap<RemoteObjectReference, WeakReference<RemoteInvocationProxy>> proxyReferences = new HashMap<RemoteObjectReference, WeakReference<RemoteInvocationProxy>>();
 
-	private HashMap<Long, Thread> waitingThreads;
-	private HashMap<Long, LocalInvocation> pendingInvocations;
+	private ConcurrentHashMap<Long, WaitingThread> waitingThreads = new ConcurrentHashMap<Long, WaitingThread>();
 
 	public DJavaContext(boolean bidirectional) {
 		this.bidirectional = bidirectional;
@@ -82,32 +83,53 @@ public class DJavaContext {
 		}
 	}
 
-	public void registerWaitingThread() {
-		Thread thread = Thread.currentThread();
-		waitingThreads.put(thread.getId(), thread);
-	}
-
-	/** Performs the method invocations requested of the current thread. */
-	public void performInvocations() {
-
-	}
-
-	public Serializable invoke(LocalInvocation localInvocation) throws Throwable {
-		Object result = localInvocation.invoke();
-
-		if (result != null) {
-			Class<?> returnType = localInvocation.getReturnType();
-			// TODO probably shouldn't serialize enums
-			// TODO serialize wrapper types when method doesn't return primitive
-			if (returnType == String.class || returnType.isPrimitive() || Enum.class.isAssignableFrom(returnType)) {
-				return (Serializable) result;
-			}
-			else {
-				return getObjectDescriptor(result);
+	public void invokeLocally(LocalInvocation localInvocation) {
+		Long targetThreadId = localInvocation.getTargetThreadId();
+		if (targetThreadId != null) {
+			WaitingThread waitingThread = waitingThreads.get(targetThreadId);
+			if (waitingThread != null) {
+				waitingThread.setPendingInvocation(localInvocation);
+				return;
 			}
 		}
-		else {
-			return null;
+		invoke(localInvocation);
+	}
+
+	public void invoke(LocalInvocation localInvocation) {
+		try {
+			localInvocation.invoke();
+		}
+		catch (Error e) {
+			// TODO handle fatal error
+			throw e;
+		}
+		catch (RuntimeException e) {
+			// TODO handle possibly non-fatal error
+			throw e;
+		}
+		catch (Throwable t) {
+			// TODO handle fatal error
+			t.printStackTrace();
+			throw new RuntimeException(t);
+		}
+	}
+
+	private WaitingThread registerWaitingThread() {
+		Thread thread = Thread.currentThread();
+		long id = thread.getId();
+		WaitingThread waitingThread = waitingThreads.get(id);
+		if (waitingThread == null) {
+			waitingThread = new WaitingThread(thread);
+			waitingThreads.put(id, waitingThread);
+		}
+		waitingThread.incrementDepth();
+		return waitingThread;
+	}
+
+	public void unregisterWaitingThread(WaitingThread waitingThread) {
+		waitingThread.decrementDepth();
+		if (waitingThread.getDepth() == 0) {
+			waitingThreads.remove(waitingThread.getId());
 		}
 	}
 
@@ -133,5 +155,26 @@ public class DJavaContext {
 		else {
 			return result;
 		}
+	}
+
+	public <T> T awaitResponse(Future<T> futureResponse) throws ExecutionException {
+		T response;
+		WaitingThread waitingThread = registerWaitingThread();
+		try {
+			for (;;) {
+				try {
+					response = futureResponse.get();
+					break;
+				}
+				catch (InterruptedException ex) {
+					waitingThread.performInvocation(this);
+				}
+			}
+		}
+		finally {
+			unregisterWaitingThread(waitingThread);
+		}
+
+		return response;
 	}
 }

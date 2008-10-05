@@ -22,7 +22,6 @@ package com.ryanberdeen.djava.connection.postal;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.io.ObjectStreamException;
 import java.lang.reflect.Method;
 
 import com.ryanberdeen.djava.InvocationListener;
@@ -46,6 +45,8 @@ public class InvocationRequestHandler implements RequestHandler {
 	public static final String PARAMETER_TYPES_HEADER_NAME = "Parameter-Types";
 	public static final String CONTENT_TYPE = "application/x-java-serialized-object";
 	public static final String ARGUMENT_COUNT_HEADER_NAME = "Argument-Count";
+	public static final String REQUESTING_THREAD_ID_HEADER_NAME = "Requesting-Thread-Id";
+	public static final String TARGET_THREAD_ID_HEADER_NAME = "Target-Thread-Id";
 
 	private InvocationListener invocationListener;
 
@@ -54,36 +55,22 @@ public class InvocationRequestHandler implements RequestHandler {
 	}
 
 	// TODO ensure required headers are set
-	public OutgoingResponseMessage handleRequest(IncomingRequestMessage request) {
-		OutgoingSerializedObjectResponseMessage response = new OutgoingSerializedObjectResponseMessage(request);
-
+	public OutgoingResponseMessage handleRequest(IncomingRequestMessage request) throws IOException {
 		try {
-			try {
-				PostalDJavaConnection dJavaConnection = PostalDJavaConnection.getPostalDJavaConnection(request.getConnection(), request.getUri(), true);
-				LocalInvocation localInvocation = parseMessage(request, dJavaConnection);
+			PostalDJavaConnection dJavaConnection = PostalDJavaConnection.getPostalDJavaConnection(request.getConnection(), request.getUri(), true);
+			LocalInvocation localInvocation = parseMessage(request, dJavaConnection);
 
-				response.setContentObject(dJavaConnection.invoke(localInvocation));
-			}
-			catch (Exception ex) {
-				ex.printStackTrace();
-				response.setStatus(500);
-				response.setContentObject(ex);
-				// TODO send the exception message if it can't be serialized
-			}
-			catch (Throwable t) {
-				throw (Error) t;
-			}
+			dJavaConnection.invokeLocally(localInvocation);
 		}
-		catch (ObjectStreamException ex) {
+		catch (Exception ex) {
 			ex.printStackTrace();
-			/*try {
-				response.setStatus(500);
-				response.setContentObject(ex);
-				// TODO warn
-			}
-			catch (ObjectStreamException exx) {}*/
+
 		}
-		return response;
+		catch (Throwable t) {
+			throw (Error) t;
+		}
+
+		return null;
 	}
 
 	private LocalInvocation parseMessage(IncomingRequestMessage request, PostalDJavaConnection dJavaConnection) throws ClassNotFoundException, NoSuchMethodException {
@@ -135,6 +122,12 @@ public class InvocationRequestHandler implements RequestHandler {
 		}
 
 		Integer targetId = new Integer(request.getHeader(TARGET_PROXY_ID_HEADER_NAME));
+		Long remoteThreadId = new Long(request.getHeader(REQUESTING_THREAD_ID_HEADER_NAME));
+		Long targetThreadId = null;
+		String targetThreadIdString = request.getHeader(TARGET_THREAD_ID_HEADER_NAME);
+		if (targetThreadIdString != null) {
+			targetThreadId = new Long(targetThreadIdString);
+		}
 		String methodName = request.getHeader(METHOD_NAME_HEADER_NAME);
 
 		Object target = dJavaConnection.getTarget(targetId);
@@ -145,6 +138,6 @@ public class InvocationRequestHandler implements RequestHandler {
 		Class<?> targetClass = target.getClass();
 		Method method = targetClass.getMethod(methodName, parameterTypes);
 
-		return new LocalInvocation(target, method, args, invocationListener);
+		return new PostalLocalInvocation(request, dJavaConnection, remoteThreadId, targetThreadId, target, method, args, invocationListener);
 	}
 }

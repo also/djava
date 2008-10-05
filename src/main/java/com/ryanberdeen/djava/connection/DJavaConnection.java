@@ -19,8 +19,52 @@
 
 package com.ryanberdeen.djava.connection;
 
+import com.ryanberdeen.djava.DJavaContext;
+import com.ryanberdeen.djava.LocalInvocation;
+import com.ryanberdeen.djava.ObjectDescriptor;
 import com.ryanberdeen.djava.RemoteInvocation;
+import com.ryanberdeen.djava.RemoteInvocationProxy;
 
-public interface DJavaConnection {
-	public Object invokeRemotely(RemoteInvocation invocation) throws Throwable;
+public abstract class DJavaConnection {
+	protected DJavaContext dJavaContext;
+	private ThreadLocal<Long> requestingThreadId;
+
+	public abstract Object invokeRemotely(RemoteInvocation invocation) throws Throwable;
+
+	public DJavaConnection(boolean bidirectional) {
+		dJavaContext = new DJavaContext(bidirectional);
+		requestingThreadId = new ThreadLocal<Long>();
+	}
+
+	public RemoteInvocationProxy getProxy(ObjectDescriptor objectDescriptor) {
+		return dJavaContext.getProxy(this, objectDescriptor);
+	}
+
+	public Object getTarget(Integer id) {
+		return dJavaContext.getTarget(id);
+	}
+
+	public void invokeLocally(LocalInvocation localInvocation) {
+		dJavaContext.invokeLocally(localInvocation);
+	}
+
+	public ObjectDescriptor getObjectDescriptor(Object toProxy) throws Exception {
+		return dJavaContext.getObjectDescriptor(toProxy);
+	}
+
+	@SuppressWarnings("unchecked")
+	public <T> T proxy(Class<T> interfaceClass, Integer id) {
+		Class[] classes = new Class[] {interfaceClass};
+
+		ObjectDescriptor objectDescriptor = new ObjectDescriptor(classes, id);
+		return (T) dJavaContext.getProxy(this, objectDescriptor);
+	}
+
+	public Long getRequestingThreadId() {
+		return requestingThreadId.get();
+	}
+
+	public void setRequestingThreadId(Long requestingThreadId) {
+		this.requestingThreadId.set(requestingThreadId);
+	}
 }
