@@ -26,11 +26,13 @@ public class ObjectDescriptor extends RemoteObjectReference implements Serializa
 	
 	private Class<?>[] proxiedClasses;
 	
-	public ObjectDescriptor(Class<?>[] proxiedClasses, int id) {
+	ObjectDescriptor(Class<?>[] proxiedClasses, int id) {
 		super(id);
 		this.proxiedClasses = proxiedClasses;
 	}
 	
+	/** Returns an array of interfaces implemented by the object.
+	 */
 	public Class<?>[] getProxiedClasses() {
 		return proxiedClasses;
 	}

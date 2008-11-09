@@ -19,8 +19,7 @@
 
 package com.ryanberdeen.djava;
 
-
-public class WaitingThread {
+class WaitingThread {
 	private Thread thread;
 	private int depth = 0;
 	private LocalInvocation pendingInvocation;

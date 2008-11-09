@@ -17,7 +17,7 @@
  * License along with dJava.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.ryanberdeen.djava.connection.postal;
+package com.ryanberdeen.djava.postal;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

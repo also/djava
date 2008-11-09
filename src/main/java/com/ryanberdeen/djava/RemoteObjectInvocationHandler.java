@@ -29,10 +29,9 @@ import java.lang.reflect.Method;
 import java.rmi.RemoteException;
 import java.util.concurrent.Future;
 
-import com.ryanberdeen.djava.connection.DJavaConnection;
 
 @SuppressWarnings("unused")
-public class RemoteObjectInvocationHandler implements InvocationHandler {
+class RemoteObjectInvocationHandler implements InvocationHandler {
 	private DJavaConnection connection;
 	private RemoteObjectReference remoteObjectReference;
 

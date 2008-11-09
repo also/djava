@@ -17,7 +17,7 @@
  * License along with dJava.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.ryanberdeen.djava.connection.postal;
+package com.ryanberdeen.djava.postal;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -28,14 +28,13 @@ import java.rmi.RemoteException;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
+import com.ryanberdeen.djava.DJavaConnection;
 import com.ryanberdeen.djava.DJavaContext;
 import com.ryanberdeen.djava.RemoteInvocation;
-import com.ryanberdeen.djava.connection.DJavaConnection;
 import com.ryanberdeen.postal.Connection;
 import com.ryanberdeen.postal.message.IncomingResponseMessage;
 import com.ryanberdeen.postal.message.OutgoingRequestMessage;
 import com.ryanberdeen.postal.message.ResponseMessage;
-import com.ryanberdeen.postal.message.RequestHeaders.RequestType;
 
 public class PostalDJavaConnection extends DJavaConnection {
 	private static final String CONNECTION_ATTRIBUTE_PREFIX = DJavaContext.class.getName() + "dJavaContext.";
@@ -50,7 +49,7 @@ public class PostalDJavaConnection extends DJavaConnection {
 	}
 
 	public Object invokeRemotely(RemoteInvocation invocation) throws Throwable {
-		OutgoingRequestMessage request = new OutgoingRequestMessage(connection, RequestType.EVALUATE, uri);
+		OutgoingRequestMessage request = new OutgoingRequestMessage(connection, uri);
 		request.setHeader(InvocationRequestHandler.REQUESTING_THREAD_ID_HEADER_NAME, String.valueOf(Thread.currentThread().getId()));
 		request.setHeader(InvocationRequestHandler.TARGET_PROXY_ID_HEADER_NAME, String.valueOf(invocation.getTargetId()));
 		Long targetThreadId = getRequestingThreadId();

@@ -17,18 +17,14 @@
  * License along with dJava.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.ryanberdeen.djava.connection.postal;
+package com.ryanberdeen.djava.postal;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
-import java.lang.reflect.Method;
 
 import com.ryanberdeen.djava.InvocationListener;
 import com.ryanberdeen.djava.LocalInvocation;
-import com.ryanberdeen.djava.ObjectDescriptor;
-import com.ryanberdeen.djava.RemoteObjectReference;
-import com.ryanberdeen.djava.TargetNotFoundException;
 import com.ryanberdeen.postal.handler.RequestHandler;
 import com.ryanberdeen.postal.message.IncomingRequestMessage;
 import com.ryanberdeen.postal.message.OutgoingResponseMessage;
@@ -48,9 +44,9 @@ public class InvocationRequestHandler implements RequestHandler {
 	public static final String REQUESTING_THREAD_ID_HEADER_NAME = "Requesting-Thread-Id";
 	public static final String TARGET_THREAD_ID_HEADER_NAME = "Target-Thread-Id";
 
-	private InvocationListener invocationListener;
+	private InvocationListener<?> invocationListener;
 
-	public void setInvocationListener(InvocationListener invocationListener) {
+	public void setInvocationListener(InvocationListener<?> invocationListener) {
 		this.invocationListener = invocationListener;
 	}
 
@@ -63,6 +59,7 @@ public class InvocationRequestHandler implements RequestHandler {
 			dJavaConnection.invokeLocally(localInvocation);
 		}
 		catch (Exception ex) {
+			// TODO
 			ex.printStackTrace();
 
 		}
@@ -88,20 +85,11 @@ public class InvocationRequestHandler implements RequestHandler {
 				ObjectInputStream in = new ObjectInputStream(bytes);
 				for (int i = 0; i < args.length; i++) {
 					args[i] = in.readObject();
-					if (args[i] instanceof RemoteObjectReference) {
-						if (args[i] instanceof ObjectDescriptor) {
-							// TODO
-							args[i] = dJavaConnection.getProxy((ObjectDescriptor) args[i]);
-						}
-						else {
-							args[i] = dJavaConnection.getTarget(((RemoteObjectReference) args[i]).getId());
-						}
-					}
 				}
 				in.close();
 			}
 			catch (IOException ex) {
-				// an io exceptions should never happen while using a byte arry stream
+				// an io exception should never happen while using a byte array stream
 				throw new Error(ex);
 			}
 			catch (ClassNotFoundException ex) {
@@ -130,14 +118,6 @@ public class InvocationRequestHandler implements RequestHandler {
 		}
 		String methodName = request.getHeader(METHOD_NAME_HEADER_NAME);
 
-		Object target = dJavaConnection.getTarget(targetId);
-		if (target == null) {
-			throw new TargetNotFoundException(targetId, methodName);
-		}
-
-		Class<?> targetClass = target.getClass();
-		Method method = targetClass.getMethod(methodName, parameterTypes);
-
-		return new PostalLocalInvocation(request, dJavaConnection, remoteThreadId, targetThreadId, target, method, args, invocationListener);
+		return new PostalLocalInvocation(request, dJavaConnection, remoteThreadId, targetThreadId, targetId, methodName, parameterTypes, args, invocationListener);
 	}
 }

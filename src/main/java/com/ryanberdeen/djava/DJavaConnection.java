@@ -17,24 +17,18 @@
  * License along with dJava.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.ryanberdeen.djava.connection;
-
-import com.ryanberdeen.djava.DJavaContext;
-import com.ryanberdeen.djava.LocalInvocation;
-import com.ryanberdeen.djava.ObjectDescriptor;
-import com.ryanberdeen.djava.RemoteInvocation;
-import com.ryanberdeen.djava.RemoteInvocationProxy;
+package com.ryanberdeen.djava;
 
 public abstract class DJavaConnection {
 	protected DJavaContext dJavaContext;
 	private ThreadLocal<Long> requestingThreadId;
 
-	public abstract Object invokeRemotely(RemoteInvocation invocation) throws Throwable;
-
 	public DJavaConnection(boolean bidirectional) {
 		dJavaContext = new DJavaContext(bidirectional);
 		requestingThreadId = new ThreadLocal<Long>();
 	}
+
+	public abstract Object invokeRemotely(RemoteInvocation invocation) throws Throwable;
 
 	public RemoteInvocationProxy getProxy(ObjectDescriptor objectDescriptor) {
 		return dJavaContext.getProxy(this, objectDescriptor);
@@ -64,7 +58,7 @@ public abstract class DJavaConnection {
 		return requestingThreadId.get();
 	}
 
-	public void setRequestingThreadId(Long requestingThreadId) {
+	void setRequestingThreadId(Long requestingThreadId) {
 		this.requestingThreadId.set(requestingThreadId);
 	}
 }

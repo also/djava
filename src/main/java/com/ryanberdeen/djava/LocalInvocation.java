@@ -24,36 +24,53 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 
-import com.ryanberdeen.djava.connection.DJavaConnection;
 
 /** Stores values necessary to invoke a method on a target.
  *
  */
-public abstract class LocalInvocation extends Invocation<Object> {
+public abstract class LocalInvocation {
 	private long requestingThreadId;
 	private Long targetThreadId;
 	protected DJavaConnection dJavaConnection;
+	protected Integer targetId;
+	protected String methodName;
+	private Class<?>[] parameterTypes;
+	protected Object[] argumentSpecifications;
 	@SuppressWarnings("unchecked")
 	private InvocationListener invocationListener;
 
-	public LocalInvocation(DJavaConnection dJavaConnection, long requestingThreadId, Long targetThreadId, Object target, Method method, Object[] arguments, InvocationListener<?> invocationListener) {
-		super(target, method, arguments);
+	public LocalInvocation(DJavaConnection dJavaConnection, long requestingThreadId, Long targetThreadId, Integer targetId, String methodName, Class<?>[] parameterTypes, Object[] argumentSpecifications, InvocationListener<?> invocationListener) {
 		this.dJavaConnection = dJavaConnection;
 		this.requestingThreadId = requestingThreadId;
 		this.targetThreadId = targetThreadId;
+		this.argumentSpecifications = argumentSpecifications;
+		this.methodName = methodName;
+		this.targetId = targetId;
+		this.parameterTypes = parameterTypes;
 		this.invocationListener = invocationListener;
 	}
 
-	public Long getTargetThreadId() {
+	Long getTargetThreadId() {
 		return targetThreadId;
 	}
 
-	public void invoke() throws Throwable {
+	void invoke() throws Throwable {
 		Long outerRequestingThreadId = dJavaConnection.getRequestingThreadId();
 		dJavaConnection.setRequestingThreadId(requestingThreadId);
 
 		try {
 			Object result;
+
+			Object target = dJavaConnection.getTarget(targetId);
+			if (target == null) {
+				throw new TargetNotFoundException(targetId, methodName);
+			}
+
+			Class<?> targetClass = target.getClass();
+			Method method = targetClass.getMethod(methodName, parameterTypes);
+
+			Object[] arguments = buildArguments();
+
 			// TODO why is this necessary
 			method.setAccessible(true);
 
@@ -63,12 +80,12 @@ public abstract class LocalInvocation extends Invocation<Object> {
 					if (Modifier.isSynchronized(method.getModifiers())) {
 						/* make sure that events for target are logged in the order they actually happen */
 						synchronized (target) {
-							result = invokeAndNotify();
+							result = invokeAndNotify(target, method, arguments);
 						}
 					}
 					else {
 						/* if the method isn't synchronized, order doesn't matter */
-						result = invokeAndNotify();
+						result = invokeAndNotify(target, method, arguments);
 					}
 				}
 				else {
@@ -86,7 +103,8 @@ public abstract class LocalInvocation extends Invocation<Object> {
 				}
 			}
 
-			handleResult(toResponse(result));
+			Class<?> returnType = method.getReturnType();
+			handleResult(toResponse(returnType, result));
 		}
 		catch (Exception ex) {
 			handleInternalThrowable(ex);
@@ -106,7 +124,7 @@ public abstract class LocalInvocation extends Invocation<Object> {
 	/** Invokes the method on the target, notifying the listener before and after.
 	 */
 	@SuppressWarnings("unchecked")
-	private Object invokeAndNotify() throws InvocationTargetException, IllegalAccessException {
+	private Object invokeAndNotify(Object target, Method method, Object[] arguments) throws InvocationTargetException, IllegalAccessException {
 		Object before = invocationListener.beforeMethodInvocation(target, method, arguments);
 		Object result = method.invoke(target, arguments);
 		invocationListener.afterMethodInvocation(before, result);
@@ -114,9 +132,25 @@ public abstract class LocalInvocation extends Invocation<Object> {
 		return result;
 	}
 
-	private Serializable toResponse(Object result) throws Exception {
+	private Object[] buildArguments() {
+		Object[] result = new Object[argumentSpecifications.length];
+		for (int i = 0; i < result.length; i++) {
+			if (argumentSpecifications[i] instanceof ObjectDescriptor) {
+				// TODO
+				result[i] = dJavaConnection.getProxy((ObjectDescriptor) argumentSpecifications[i]);
+			}
+			else if (argumentSpecifications[i] instanceof RemoteObjectReference) {
+				result[i] = dJavaConnection.getTarget(((RemoteObjectReference) argumentSpecifications[i]).getId());
+			}
+			else {
+				result[i] = argumentSpecifications[i];
+			}
+		}
+		return result;
+	}
+
+	private Serializable toResponse(Class<?> returnType, Object result) throws Exception {
 		if (result != null) {
-			Class<?> returnType = method.getReturnType();
 			// TODO probably shouldn't serialize enums
 			// TODO serialize wrapper types when method doesn't return primitive
 			if (returnType == String.class || returnType.isPrimitive() || Enum.class.isAssignableFrom(returnType)) {

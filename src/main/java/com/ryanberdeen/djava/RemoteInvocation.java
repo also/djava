@@ -21,9 +21,15 @@ package com.ryanberdeen.djava;
 
 import java.lang.reflect.Method;
 
-public class RemoteInvocation extends Invocation<RemoteObjectReference> {
-	public RemoteInvocation(RemoteObjectReference target, Method method, Object[] arguments) {
-		super(target, method, arguments);
+public class RemoteInvocation {
+	private RemoteObjectReference target;
+	private Method method;
+	private Object[] arguments;
+
+	RemoteInvocation(RemoteObjectReference target, Method method, Object[] arguments) {
+		this.arguments = arguments;
+		this.method = method;
+		this.target = target;
 	}
 
 	public Integer getTargetId() {
@@ -32,6 +38,10 @@ public class RemoteInvocation extends Invocation<RemoteObjectReference> {
 
 	public String getMethodName() {
 		return method.getName();
+	}
+
+	public Object[] getArguments() {
+		return arguments;
 	}
 
 	public Class<?>[] getParameterTypes() {
