@@ -31,12 +31,16 @@ import java.util.concurrent.Future;
 import com.ryanberdeen.djava.DJavaConnection;
 import com.ryanberdeen.djava.DJavaContext;
 import com.ryanberdeen.djava.RemoteInvocation;
+import com.ryanberdeen.djava.RemoteObjectReference;
 import com.ryanberdeen.postal.Connection;
 import com.ryanberdeen.postal.message.IncomingResponseMessage;
 import com.ryanberdeen.postal.message.OutgoingRequestMessage;
 import com.ryanberdeen.postal.message.ResponseMessage;
 
 public class PostalDJavaConnection extends DJavaConnection {
+	public static final String REQUEST_INVOKE = "invoke";
+	public static final String REQUEST_FINALIZE = "finalize";
+
 	private static final String CONNECTION_ATTRIBUTE_PREFIX = DJavaContext.class.getName() + "dJavaContext.";
 
 	private Connection connection;
@@ -49,15 +53,15 @@ public class PostalDJavaConnection extends DJavaConnection {
 	}
 
 	public Object invokeRemotely(RemoteInvocation invocation) throws Throwable {
-		OutgoingRequestMessage request = new OutgoingRequestMessage(connection, uri);
-		request.setHeader(InvocationRequestHandler.REQUESTING_THREAD_ID_HEADER_NAME, String.valueOf(Thread.currentThread().getId()));
-		request.setHeader(InvocationRequestHandler.TARGET_PROXY_ID_HEADER_NAME, String.valueOf(invocation.getTargetId()));
+		OutgoingRequestMessage request = new OutgoingRequestMessage(connection, REQUEST_INVOKE, uri);
+		request.setHeader(DJavaRequestHandler.REQUESTING_THREAD_ID_HEADER_NAME, String.valueOf(Thread.currentThread().getId()));
+		request.setHeader(DJavaRequestHandler.TARGET_PROXY_ID_HEADER_NAME, String.valueOf(invocation.getTargetId()));
 		Long targetThreadId = getRequestingThreadId();
 		if (targetThreadId != null) {
-			request.setHeader(InvocationRequestHandler.TARGET_THREAD_ID_HEADER_NAME, String.valueOf(targetThreadId));
+			request.setHeader(DJavaRequestHandler.TARGET_THREAD_ID_HEADER_NAME, String.valueOf(targetThreadId));
 		}
 
-		request.setHeader(InvocationRequestHandler.METHOD_NAME_HEADER_NAME, invocation.getMethodName());
+		request.setHeader(DJavaRequestHandler.METHOD_NAME_HEADER_NAME, invocation.getMethodName());
 		Class<?>[] parameterTypes = invocation.getParameterTypes();
 		StringBuilder parameterTypesStringBuidler = new StringBuilder();
 		if (parameterTypes.length > 0) {
@@ -67,11 +71,11 @@ public class PostalDJavaConnection extends DJavaConnection {
 				parameterTypesStringBuidler.append(parameterTypes[i].getName());
 			}
 		}
-		request.setHeader(InvocationRequestHandler.PARAMETER_TYPES_HEADER_NAME, parameterTypesStringBuidler.toString());
+		request.setHeader(DJavaRequestHandler.PARAMETER_TYPES_HEADER_NAME, parameterTypesStringBuidler.toString());
 
 		Object[] args = invocation.getArguments();
 		if (args != null) {
-			request.setHeader(InvocationRequestHandler.ARGUMENT_COUNT_HEADER_NAME, String.valueOf(args.length));
+			request.setHeader(DJavaRequestHandler.ARGUMENT_COUNT_HEADER_NAME, String.valueOf(args.length));
 			ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 			try {
 				ObjectOutputStream out = new ObjectOutputStream(bytes);
@@ -89,10 +93,10 @@ public class PostalDJavaConnection extends DJavaConnection {
 				throw new Error(ex);
 			}
 
-			request.setContent(bytes.toByteArray(), InvocationRequestHandler.CONTENT_TYPE);
+			request.setContent(bytes.toByteArray(), DJavaRequestHandler.CONTENT_TYPE);
 		}
 		else {
-			request.setHeader(InvocationRequestHandler.ARGUMENT_COUNT_HEADER_NAME, "0");
+			request.setHeader(DJavaRequestHandler.ARGUMENT_COUNT_HEADER_NAME, "0");
 		}
 
 		ResponseMessage response;
@@ -124,16 +128,11 @@ public class PostalDJavaConnection extends DJavaConnection {
 	}
 
 	public void sendResponse(OutgoingSerializedObjectResponseMessage response) {
-		try {
-			connection.sendResponse(response);
-		}
-		catch (IOException ex) {
-			// TODO what do we do if sending the return value fails
-		}
+		connection.sendResponse(response);
 	}
 
 	private Object getObjectContent(ResponseMessage response) throws Exception {
-		if (InvocationRequestHandler.CONTENT_TYPE.equals(response.getContentType())) {
+		if (DJavaRequestHandler.CONTENT_TYPE.equals(response.getContentType())) {
 			ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(response.getContent()));
 
 			return dJavaContext.fromResponse(this, in.readObject());
@@ -141,6 +140,12 @@ public class PostalDJavaConnection extends DJavaConnection {
 		else {
 			return null;
 		}
+	}
+
+	public void finalizeRemotely(RemoteObjectReference remoteObjectReference) {
+		OutgoingRequestMessage request = new OutgoingRequestMessage(connection, REQUEST_FINALIZE, uri);
+		request.setContent(String.valueOf(remoteObjectReference.getId()));
+		connection.sendRequestAndIgnoreResponse(request);
 	}
 
 	public static PostalDJavaConnection getPostalDJavaConnection(Connection connection, String uri, boolean bidirectional) {

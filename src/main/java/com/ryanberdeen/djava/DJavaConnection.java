@@ -64,6 +64,12 @@ public abstract class DJavaConnection {
 
 	void finalizeRemoteObjectReference(RemoteObjectReference remoteObjectReference) {
 		dJavaContext.removeProxyReference(remoteObjectReference);
-		// TODO notify remote
+		finalizeRemotely(remoteObjectReference);
+	}
+
+	protected abstract void finalizeRemotely(RemoteObjectReference remoteObjectReference);
+
+	public void removeLocalObject(int id) {
+		dJavaContext.removeLocalObject(id);
 	}
 }

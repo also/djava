@@ -180,4 +180,8 @@ public class DJavaContext {
 	void removeProxyReference(RemoteObjectReference remoteObjectReference) {
 		proxyReferences.remove(remoteObjectReference);
 	}
+
+	public void removeLocalObject(int id) {
+		localObjects.remove(id);
+	}
 }

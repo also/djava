@@ -33,7 +33,7 @@ import com.ryanberdeen.postal.message.OutgoingResponseMessage;
  * @author rmberdeen
  *
  */
-public class InvocationRequestHandler implements RequestHandler {
+public class DJavaRequestHandler implements RequestHandler {
 	public static final String PARAMETER_TYPES_HEADER_SEPARATOR = ",";
 	public static final String METHOD_NAME_HEADER_NAME = "Method-Name";
 	public static final String TARGET_PROXY_ID_HEADER_NAME = "Target-Proxy-Id";
@@ -52,8 +52,22 @@ public class InvocationRequestHandler implements RequestHandler {
 
 	// TODO ensure required headers are set
 	public OutgoingResponseMessage handleRequest(IncomingRequestMessage request) throws IOException {
+		String requestType = request.getRequestType();
+		if (PostalDJavaConnection.REQUEST_INVOKE.equals(requestType)) {
+			handleInvocationRequest(request);
+		}
+		else if (PostalDJavaConnection.REQUEST_FINALIZE.equals(requestType)) {
+			getPostalDJavaConnection(request).removeLocalObject(Integer.parseInt(request.getContentAsString()));
+		}
+		else {
+			// TODO send error response
+		}
+		return null;
+	}
+
+	private void handleInvocationRequest(IncomingRequestMessage request) {
 		try {
-			PostalDJavaConnection dJavaConnection = PostalDJavaConnection.getPostalDJavaConnection(request.getConnection(), request.getUri(), true);
+			PostalDJavaConnection dJavaConnection = getPostalDJavaConnection(request);
 			LocalInvocation localInvocation = parseMessage(request, dJavaConnection);
 
 			dJavaConnection.invokeLocally(localInvocation);
@@ -66,8 +80,10 @@ public class InvocationRequestHandler implements RequestHandler {
 		catch (Throwable t) {
 			throw (Error) t;
 		}
+	}
 
-		return null;
+	private PostalDJavaConnection getPostalDJavaConnection(IncomingRequestMessage request) {
+		return PostalDJavaConnection.getPostalDJavaConnection(request.getConnection(), request.getUri(), true);
 	}
 
 	private LocalInvocation parseMessage(IncomingRequestMessage request, PostalDJavaConnection dJavaConnection) throws ClassNotFoundException, NoSuchMethodException {

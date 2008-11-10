@@ -41,7 +41,7 @@ public class OutgoingSerializedObjectResponseMessage extends OutgoingResponseMes
 			out.writeObject(content);
 			out.close();
 
-			setContent(bytes.toByteArray(), InvocationRequestHandler.CONTENT_TYPE);
+			setContent(bytes.toByteArray(), DJavaRequestHandler.CONTENT_TYPE);
 		}
 		catch (InvalidClassException ex) {
 			throw ex;
