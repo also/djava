@@ -39,6 +39,8 @@ public class DJavaContext {
 
 	private ConcurrentHashMap<Long, WaitingThread> waitingThreads = new ConcurrentHashMap<Long, WaitingThread>();
 
+	private ConcurrentHashMap<String, Object> namedObjects = new ConcurrentHashMap<String, Object>();
+
 	public DJavaContext(boolean bidirectional) {
 		this.bidirectional = bidirectional;
 	}
@@ -59,6 +61,24 @@ public class DJavaContext {
 			}
 
 			return objectDescriptor;
+		}
+	}
+
+	public void registerNamedObject(String name, Object object) {
+		namedObjects.put(name, object);
+	}
+
+	public Object getNamedObject(String name) {
+		return namedObjects.get(name);
+	}
+
+	public ObjectDescriptor getNamedObjectDescriptor(String name) {
+		Object object = getNamedObject(name);
+		if (object == null) {
+			return null;
+		}
+		else {
+			return getObjectDescriptor(object);
 		}
 	}
 

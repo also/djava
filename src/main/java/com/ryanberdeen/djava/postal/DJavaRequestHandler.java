@@ -57,7 +57,10 @@ public class DJavaRequestHandler implements RequestHandler {
 			handleInvocationRequest(request);
 		}
 		else if (PostalDJavaConnection.REQUEST_FINALIZE.equals(requestType)) {
-			getPostalDJavaConnection(request).removeLocalObject(Integer.parseInt(request.getContentAsString()));
+			handleFinalizeRequest(request);
+		}
+		else if (PostalDJavaConnection.REQUEST_LOOKUP.equals(requestType)) {
+			handleLookupRequest(request);
 		}
 		else {
 			// TODO send error response
@@ -79,6 +82,23 @@ public class DJavaRequestHandler implements RequestHandler {
 		}
 		catch (Throwable t) {
 			throw (Error) t;
+		}
+	}
+
+	public void handleFinalizeRequest(IncomingRequestMessage request) {
+		PostalDJavaConnection dJavaConnection = getPostalDJavaConnection(request);
+		dJavaConnection.removeLocalObject(Integer.parseInt(request.getContentAsString()));
+	}
+
+	private void handleLookupRequest(IncomingRequestMessage request) {
+		OutgoingSerializedObjectResponseMessage response = new OutgoingSerializedObjectResponseMessage(request);
+		PostalDJavaConnection dJavaConnection = getPostalDJavaConnection(request);
+		try {
+			response.setContentObject(dJavaConnection.getNamedObjectDescriptor(request.getContentAsString()));
+			request.getConnection().sendResponse(response);
+		}
+		catch (Exception ex) {
+			// TODO send error response
 		}
 	}
 

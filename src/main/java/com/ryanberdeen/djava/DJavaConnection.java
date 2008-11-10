@@ -63,6 +63,13 @@ public abstract class DJavaConnection {
 		return (T) dJavaContext.getProxy(this, objectDescriptor);
 	}
 
+	public Object proxy(String name) {
+		ObjectDescriptor objectDescriptor = lookUpRemoteObject(name);
+		return objectDescriptor != null ? dJavaContext.getProxy(this, objectDescriptor) : null;
+	}
+
+	public abstract ObjectDescriptor lookUpRemoteObject(String name);
+
 	public Long getRequestingThreadId() {
 		return requestingThreadId.get();
 	}
@@ -80,5 +87,9 @@ public abstract class DJavaConnection {
 
 	public void removeLocalObject(int id) {
 		dJavaContext.removeLocalObject(id);
+	}
+
+	public ObjectDescriptor getNamedObjectDescriptor(String name) {
+		return dJavaContext.getNamedObjectDescriptor(name);
 	}
 }

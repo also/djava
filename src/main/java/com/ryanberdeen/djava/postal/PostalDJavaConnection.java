@@ -30,6 +30,7 @@ import java.util.concurrent.Future;
 
 import com.ryanberdeen.djava.DJavaConnection;
 import com.ryanberdeen.djava.DJavaContext;
+import com.ryanberdeen.djava.ObjectDescriptor;
 import com.ryanberdeen.djava.RemoteInvocation;
 import com.ryanberdeen.djava.RemoteObjectReference;
 import com.ryanberdeen.postal.Connection;
@@ -40,6 +41,7 @@ import com.ryanberdeen.postal.message.ResponseMessage;
 public class PostalDJavaConnection extends DJavaConnection {
 	public static final String REQUEST_INVOKE = "invoke";
 	public static final String REQUEST_FINALIZE = "finalize";
+	public static final String REQUEST_LOOKUP = "lookup";
 
 	private static final String CONNECTION_ATTRIBUTE_PREFIX = DJavaContext.class.getName() + "dJavaContext.";
 
@@ -138,6 +140,20 @@ public class PostalDJavaConnection extends DJavaConnection {
 			return dJavaContext.fromResponse(this, in.readObject());
 		}
 		else {
+			return null;
+		}
+	}
+
+	@Override
+	public ObjectDescriptor lookUpRemoteObject(String name) {
+		OutgoingRequestMessage request = new OutgoingRequestMessage(connection, REQUEST_LOOKUP, uri);
+		request.setContent(name);
+		IncomingResponseMessage response = connection.sendRequestAndAwaitResponseUninterruptibly(request);
+		try {
+			ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(response.getContent()));
+			return (ObjectDescriptor) in.readObject();
+		}
+		catch (Exception ex) {
 			return null;
 		}
 	}
