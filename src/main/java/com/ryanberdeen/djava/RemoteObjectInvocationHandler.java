@@ -19,18 +19,9 @@
 
 package com.ryanberdeen.djava;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
-import java.rmi.RemoteException;
-import java.util.concurrent.Future;
 
-
-@SuppressWarnings("unused")
 class RemoteObjectInvocationHandler implements InvocationHandler {
 	private DJavaConnection connection;
 	private RemoteObjectReference remoteObjectReference;
@@ -45,5 +36,10 @@ class RemoteObjectInvocationHandler implements InvocationHandler {
 			return remoteObjectReference;
 		}
 		return connection.invokeRemotely(new RemoteInvocation(remoteObjectReference, method, args));
+	}
+
+	@Override
+	protected void finalize() {
+		connection.finalizeRemoteObjectReference(remoteObjectReference);
 	}
 }

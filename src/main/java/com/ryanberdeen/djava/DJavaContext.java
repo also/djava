@@ -176,4 +176,8 @@ public class DJavaContext {
 
 		return response;
 	}
+
+	void removeProxyReference(RemoteObjectReference remoteObjectReference) {
+		proxyReferences.remove(remoteObjectReference);
+	}
 }

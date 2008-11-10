@@ -61,4 +61,9 @@ public abstract class DJavaConnection {
 	void setRequestingThreadId(Long requestingThreadId) {
 		this.requestingThreadId.set(requestingThreadId);
 	}
+
+	void finalizeRemoteObjectReference(RemoteObjectReference remoteObjectReference) {
+		dJavaContext.removeProxyReference(remoteObjectReference);
+		// TODO notify remote
+	}
 }
