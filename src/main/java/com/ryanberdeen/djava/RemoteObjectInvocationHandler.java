@@ -22,6 +22,8 @@ package com.ryanberdeen.djava;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 
+/** Invocation handler the invokes methods using a dJava connection.
+ */
 class RemoteObjectInvocationHandler implements InvocationHandler {
 	private DJavaConnection connection;
 	private RemoteObjectReference remoteObjectReference;

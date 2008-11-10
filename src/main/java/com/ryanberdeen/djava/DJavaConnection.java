@@ -19,6 +19,9 @@
 
 package com.ryanberdeen.djava;
 
+/** A connection to a remote system capable of handling dJava method invocations.
+ *
+ */
 public abstract class DJavaConnection {
 	protected DJavaContext dJavaContext;
 	private ThreadLocal<Long> requestingThreadId;
@@ -42,10 +45,16 @@ public abstract class DJavaConnection {
 		dJavaContext.invokeLocally(localInvocation);
 	}
 
-	public ObjectDescriptor getObjectDescriptor(Object toProxy) throws Exception {
+	public ObjectDescriptor getObjectDescriptor(Object toProxy) {
 		return dJavaContext.getObjectDescriptor(toProxy);
 	}
 
+	/** Returns a proxy object that forwards method invocations to the remote object specified.
+	 * @param <T> the interface of the proxied object
+	 * @param interfaceClass the interface to proxy
+	 * @param id the remote id of the object
+	 * @return an object implementing the specified interface
+	 */
 	@SuppressWarnings("unchecked")
 	public <T> T proxy(Class<T> interfaceClass, Integer id) {
 		Class[] classes = new Class[] {interfaceClass};

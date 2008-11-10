@@ -47,7 +47,7 @@ public class DJavaContext {
 		return localObjects.get(id);
 	}
 
-	public ObjectDescriptor getObjectDescriptor(Object toProxy) throws Exception {
+	public ObjectDescriptor getObjectDescriptor(Object toProxy) {
 		synchronized (objectDescriptors) {
 			ObjectDescriptor objectDescriptor = objectDescriptors.get(toProxy);
 
